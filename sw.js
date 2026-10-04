@@ -1,11 +1,11 @@
 /* Service worker : met l'app en cache pour qu'elle marche sans réseau.
    Change VERSION à chaque mise à jour des fichiers. */
-const VERSION = "macros-v2.0.0";
+const VERSION = "macros-v2.0.1";
 const ASSETS = [
   "./", "./index.html", "./manifest.webmanifest",
-  "./vendor/zxing.min.js",
-  "./fonts/Poppins-Regular.ttf", "./fonts/Poppins-Medium.ttf", "./fonts/Poppins-Bold.ttf",
-  "./icons/icon-180.png", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/maskable-512.png", "./icons/favicon-32.png"
+  "./zxing.min.js",
+  "./Poppins-Regular.ttf", "./Poppins-Medium.ttf", "./Poppins-Bold.ttf",
+  "./icon-180.png", "./icon-192.png", "./icon-512.png", "./maskable-512.png", "./favicon-32.png"
 ];
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(VERSION).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
