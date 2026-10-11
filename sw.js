@@ -1,6 +1,6 @@
 /* Service worker : met l'app en cache pour qu'elle marche sans réseau.
    Change VERSION à chaque mise à jour des fichiers. */
-const VERSION = "macros-v2.0.1";
+const VERSION = "macros-v2.1.0";
 const ASSETS = [
   "./", "./index.html", "./manifest.webmanifest",
   "./zxing.min.js",
