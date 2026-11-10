@@ -246,6 +246,7 @@ svg.chart{width:100%;height:auto;display:block}
 .ri.out{opacity:.35}
 .st-low{color:var(--fat)!important;font-weight:500}
 .st-out{color:var(--bad)!important;font-weight:500}
+.st-ok{color:var(--good,#16A34A)}
 .dayafter{font-size:13px;color:var(--sub);margin-top:8px}
 .dayafter b{color:var(--text);font-weight:600}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
@@ -641,7 +642,7 @@ function renderHist(){
 /* ================= rendu : aliments & courses ================= */
 let foodView="cat", foodCat=null;
 const BACK = label=>`<button class="back" data-back><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M15 6l-6 6 6 6"/></svg>${label}</button>`;
-const foodRow = (f, attr="data-food")=>`<button class="foodrow" ${attr}="${f.id}"><div class="t"><div>${esc(f.name)}</div><small>${r0(f.portion)} ${f.unit||"g"}</small></div><div class="k2"><b>${r0(f.kcal)}</b> kcal<br>${r0(f.p)} g prot.</div></button>`;
+const foodRow = (f, attr="data-food")=>`<button class="foodrow" ${attr}="${f.id}"><div class="t"><div>${esc(f.name)}</div><small>${r0(f.portion)} ${f.unit||"g"}${(()=>{ const e=typeof stockOf==="function"&&stockOf(f.id); return e?` · <span class="${e.g<=0?"st-out":e.g<e.thr?"st-low":"st-ok"}">stock ${e.g<=0?"épuisé":fmtQ(f,e.g)}</span>`:""; })()}</small></div><div class="k2"><b>${r0(f.kcal)}</b> kcal<br>${r0(f.p)} g prot.</div></button>`;
 const tplRow = t=>{ const T=totals(t.items); return `<button class="foodrow" data-tplview="${t.id}"><div class="t"><div>${esc(t.name)}</div><small>${t.items.length} aliment${t.items.length>1?"s":""}</small></div><div class="k2"><b>${r0(T.kcal)}</b> kcal<br>${r0(T.p)} g prot.</div></button>`; };
 const byName = (a,b)=>a.name.localeCompare(b.name,"fr");
 function catTiles(extraTpl){
@@ -854,7 +855,7 @@ function openAdd(slot, mode){
   openSheet(`<div class="sheethead"><h2>Ajouter</h2><div style="display:flex;gap:8px;align-items:center">
       <select class="slotsel" id="slotSel" aria-label="Repas">${SLOTS.map(s=>`<option value="${s.id}" ${s.id===add.slot?"selected":""}>${s.label}</option>`).join("")}</select>
       <button class="iconbtn" data-close aria-label="Fermer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div></div><div id="addBody"></div>`);
-  $("slotSel").onchange=e=>{ add.slot=e.target.value; const q=$("qAdd"); if(q) q.textContent="Ajouter "+slotName(); const c=$("commit"); if(c) c.textContent="Ajouter "+slotName(); const p=$("pAdd"); if(p) p.textContent="Ajouter "+slotName(); const ca=$("cAdd"); if(ca) ca.textContent="Ajouter "+slotName(); };
+  $("slotSel").onchange=e=>{ add.slot=e.target.value; const q=$("qAdd"); if(q) q.textContent="Ajouter "+slotName(); const c=$("commit"); if(c) c.textContent="Ajouter "+slotName(); const p=$("pAdd"); if(p) p.textContent="Ajouter "+slotName(); const ca=$("cAdd"); if(ca) ca.textContent="Ajouter "+slotName(); if(add.mode==="compo"||add.mode==="home"){ comp=null; renderAddBody(); } };
   renderAddBody();
 }
 sheet.addEventListener("click",e=>{
@@ -876,7 +877,7 @@ const MODE_TITLES={compo:"Composer mon plat",scan:"Code-barres",photo:"Photo",tp
 function renderAddBody(){
   const b=$("addBody"); if(!b) return;
   if(add.mode==="home") return renderHome(b);
-  b.innerHTML = `<button class="back" data-home><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M15 6l-6 6 6 6"/></svg>${MODE_TITLES[add.mode]||"Retour"}</button><div id="modeBody"></div>`;
+  b.innerHTML = `<button class="back" data-home><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M15 6l-6 6 6 6"/></svg>${add.mode==="compo"?(SLOT_COMPO_TITLES[add.slot]||"Composer"):(MODE_TITLES[add.mode]||"Retour")}</button><div id="modeBody"></div>`;
   ({compo:renderCompo, tpl:renderTpl, scan:renderScan, photo:renderPhoto, text:renderText, manual:renderManual})[add.mode]($("modeBody"));
 }
 function recentFoods(){
@@ -898,12 +899,18 @@ function renderHome(b){
       r.innerHTML += `<div class="links"><button data-go="text">Décrire un repas</button><button data-go="manual">Saisie manuelle</button></div>`;
       return;
     }
-    r.innerHTML = `<button class="compobtn" data-go="compo"><span class="em">🎰</span><div><b>Composer mon plat</b><small>Tu choisis tes ingrédients, l'appli calcule les grammes</small></div></button>
+    const sl=add.slot, plat=(sl==="soir");
+    const quick = sl==="midi"
+      ? (()=>{ const pic=state.foods.filter(f=>catOf(f)==="picard").sort(byName), hp=pic.filter(f=>/HyperProt/.test(f.group||"")), ro=pic.filter(f=>!/HyperProt/.test(f.group||""));
+          return (hp.length?`<div class="grp">Picard HyperProtéiné</div><div class="items">${hp.map(f=>foodRow(f,"data-pick")).join("")}</div>`:"")+(ro.length?`<div class="grp">Autres plats Picard</div><div class="items">${ro.map(f=>foodRow(f,"data-pick")).join("")}</div>`:""); })()
+      : (()=>{ const st=homeStockFoods(sl); return st.length?`<div class="grp">Dans ton stock</div><div class="items">${st.map(f=>foodRow(f,"data-pick")).join("")}</div>`:""; })();
+    r.innerHTML = `<button class="compobtn" data-go="compo"><span class="em">🎰</span><div><b>${SLOT_COMPO_TITLES[sl]||"Composer"}</b><small>${plat?"Avec ce que tu as en stock, l'appli calcule les grammes":sl==="midi"?"Roues de tes plats Picard, ou un plat maison":"Avec ce que tu as en stock"}</small></div></button>
       <div class="acts3">
         <button class="act" data-go="scan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 7V5h3M17 5h3v2M20 17v2h-3M7 19H4v-2M7 9v6M10 9v6M13 9v6M16.5 9v6"/></svg>Scanner</button>
         <button class="act" data-go="photo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-2.5h6L17 8h3v11H4z"/><circle cx="12" cy="13.5" r="3.6"/></svg>Photo</button>
         <button class="act" data-go="tpl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>Repas type</button>
       </div>
+      ${quick}
       <div class="grp">Récents</div><div class="items">${recentFoods().map(f=>foodRow(f,"data-pick")).join("")}</div>
       <div class="links"><button data-go="text">Décrire un repas</button><button data-go="manual">Saisie manuelle</button></div>`;
   };
@@ -950,78 +957,143 @@ function openTemplateEdit(id){
   $("tDel").onclick=()=>{ state.templates=state.templates.filter(x=>x.id!==id); save(); closeSheet(); renderFoods(); toast("Supprimé"); };
 }
 
-/* ---- composer mon plat (roues façon machine à sous) ---- */
+/* ---- composer mon repas (roues façon machine à sous, construites depuis le stock) ---- */
 const REEL_H = 66, REEL_REP = 9, REEL_MID = 4;
 const NONE_OPT = {e:"✖️", l:"Aucun", none:true};
+const EMPTY_OPT = {e:"🛒", l:"Rien en stock", none:true};
+// réglages fins pour les produits habituels (portions, bornes, libellés courts)
 const O = (e,l,n,x)=>Object.assign({e,l,n},x||{});
-const COMPO_SOIR = {
-  prot:[
-    O("🍗","Poulet","Blanc de poulet cru",{min:150,max:280,step:10,note:"cru"}),
-    O("🥩","Haché 5 %","Viande hachée 5 % crue",{min:150,max:300,step:10,note:"cru"}),
-    O("🍔","Steak boucher","Steak haché boucher 15 % cru",{min:125,max:300,step:5,note:"cru"}),
-    O("🐟","Thon","Thon au naturel égoutté",{min:100,max:280,step:10,note:"égoutté"}),
-    O("🥚","Œufs","Oeuf",{pc:["œuf","œufs"],min:3,max:6,step:1}),
-    O("🧆","Boulettes Picard","Boulettes de boeuf Picard",{min:100,max:300,step:25,note:"surgelées"}),
-  ],
-  fec:[
-    O("🍝","Pâtes protéinées","Pâtes High Protein Carrefour crues",{min:60,max:160,step:5,note:"crues"}),
-    O("🍝","Pâtes complètes","Pâtes complètes Barilla crues",{min:60,max:160,step:5,note:"crues"}),
-    O("🍚","Riz complet","Riz basmati complet cru",{min:50,max:140,step:5,note:"cru"}),
-    O("🥔","Wedges","Wedges Picard (surgelées)",{min:120,max:350,step:10,note:"surgelées"}),
-    O("🌯","Wrap XL","Wrap blé XL Mission",{pc:["wrap","wraps"],min:1,max:2,step:1}),
-    NONE_OPT,
-  ],
-  leg:[
-    O("🫛","Haricots verts","Haricots verts surgelés",{def:200,note:"surgelés"}),
-    O("🥘","Poêlée","Poêlée de légumes Picard",{def:300,note:"½ sachet"}),
-    O("🍆","Ratatouille","Ratatouille Cassegrain",{def:185,note:"petite boîte"}),
-    O("🥦","Brocolis","Brocolis surgelés",{def:200,note:"surgelés"}),
-    NONE_OPT,
-  ],
-  sau:[
-    O("🍅","Passata","Passata (coulis de tomates)",{def:150}),
-    O("🥛","Crème 4 %","Crème fraîche légère 4 %",{def:40,note:"3 c. à soupe"}),
-    O("🫕","Cancoillotte","Cancoillotte à l'ail",{def:40}),
-    O("🥫","Ketchup zéro","Ketchup Heinz zéro sel ajouté",{def:30}),
-    O("🌶️","Sriracha","Sriracha",{def:15}),
-    O("🍶","Soja","Sauce soja",{def:15}),
-    O("🧀","Parmesan","Parmesan",{def:10}),
-    NONE_OPT,
-  ],
-};
+const COMPO_OVR_LIST = [
+  O("🍗","Poulet","Blanc de poulet cru",{min:150,max:280,step:10,note:"cru"}),
+  O("🥩","Haché 5 %","Viande hachée 5 % crue",{min:150,max:300,step:10,note:"cru"}),
+  O("🍔","Steak boucher","Steak haché boucher 15 % cru",{min:125,max:300,step:5,note:"cru"}),
+  O("🐟","Thon","Thon au naturel égoutté",{min:100,max:280,step:10,note:"égoutté"}),
+  O("🥚","Œufs","Oeuf",{min:3,max:6,step:1}),
+  O("🧆","Boulettes Picard","Boulettes de boeuf Picard",{min:100,max:300,step:25,note:"surgelées"}),
+  O("🍝","Pâtes protéinées","Pâtes High Protein Carrefour crues",{min:60,max:160,step:5,note:"crues"}),
+  O("🍝","Pâtes complètes","Pâtes complètes Barilla crues",{min:60,max:160,step:5,note:"crues"}),
+  O("🍚","Riz complet","Riz basmati complet cru",{min:50,max:140,step:5,note:"cru"}),
+  O("🥔","Wedges","Wedges Picard (surgelées)",{min:120,max:350,step:10,note:"surgelées"}),
+  O("🌯","Wrap XL","Wrap blé XL Mission",{min:1,max:2,step:1}),
+  O("🫛","Haricots verts","Haricots verts surgelés",{def:200,note:"surgelés"}),
+  O("🥘","Poêlée","Poêlée de légumes Picard",{def:300,note:"½ sachet"}),
+  O("🍆","Ratatouille","Ratatouille Cassegrain",{def:185}),
+  O("🍅","Passata","Passata (coulis de tomates)",{def:150}),
+  O("🥛","Crème 4 %","Crème fraîche légère 4 %",{def:40,note:"3 c. à soupe"}),
+  O("🫕","Cancoillotte","Cancoillotte à l'ail",{def:40}),
+  O("🥫","Ketchup zéro","Ketchup Heinz zéro sel ajouté",{def:30}),
+  O("🧀","Parmesan","Parmesan",{def:10}),
+];
+const COMPO_OVR = {}; COMPO_OVR_LIST.forEach(o=>{ COMPO_OVR[slug(o.n)]=o; });
+const isFruit = f=>{ const n=norm(f.name); return !/pomme de terre|pommes de terre/.test(n) && /banane|pomme|poire|orange|kiwi|fraise|framboise|myrtille|mangue|ananas|raisin|clementine|mandarine|abricot|peche|compote|cerise|melon|pasteque|fruit/.test(n); };
+const isDessert = f=>/yaourt|skyr|fromage blanc|compote|creme dessert|petit suisse|mousse/.test(norm(f.name)) || catOf(f)==="collations";
+const SAUCE_RE = /passata|coulis|puree de tomate|tomate concassee|sauce|ketchup|moutarde|sriracha|harissa|mayo|pesto|cancoillotte|creme fraiche|creme legere|parmesan|fromage rape|vinaigrette/;
+function soirReel(f){
+  const n=norm(f.name); let c=catOf(f); if(c==="autres") c=guessCat(f.name);
+  if(c==="picard"||c==="recettes"||c==="complements"||c==="boissons") return null;
+  if(SAUCE_RE.test(n)) return "sau";
+  if(c==="viandes") return "prot";
+  if(c==="feculents") return "fec";
+  if(c==="fruitsleg") return isFruit(f)?null:"leg";
+  if(c==="sauces") return "sau";
+  return null;
+}
+const EMO = [[/shake/,"🥤"],[/poulet|dinde|nugget/,"🍗"],[/jambon|bacon|lardon/,"🥓"],[/hache|steak|boeuf|veau|porc/,"🥩"],[/thon|poisson|colin|saumon|merlu|cabillaud|sardine/,"🐟"],[/crevette/,"🦐"],[/oeuf/,"🥚"],
+  [/pate|penne|spaghetti|fusilli|gnocchi/,"🍝"],[/riz|semoule|quinoa/,"🍚"],[/wedge|frite|pomme de terre|potatoe|grenaille/,"🥔"],[/wrap|tortilla/,"🌯"],[/pain|brioche/,"🍞"],
+  [/haricot/,"🫛"],[/brocoli/,"🥦"],[/ratatouille|aubergine/,"🍆"],[/poelee|legume/,"🥘"],[/carotte/,"🥕"],[/epinard|salade/,"🥬"],[/tomate|passata|coulis/,"🍅"],
+  [/creme/,"🥛"],[/cancoillotte|fromage|parmesan|emmental|mozza|feta/,"🧀"],[/ketchup/,"🥫"],[/sriracha|harissa|piment/,"🌶️"],[/soja/,"🍶"],[/moutarde/,"🟡"],
+  [/banane/,"🍌"],[/pomme/,"🍎"],[/poire/,"🍐"],[/orange|clementine|mandarine/,"🍊"],[/fraise|framboise|myrtille|fruits rouges/,"🍓"],[/kiwi/,"🥝"],[/compote/,"🍏"],
+  [/yaourt|skyr|fromage blanc/,"🥣"],[/amande|noix|cacahuete|noisette/,"🥜"],[/cake|gateau|biscuit/,"🍰"],[/chocolat/,"🍫"],[/lait|boisson/,"🥛"],[/cafe/,"☕"]];
+function emojiFor(f){ if(catOf(f)==="picard") return /HyperProt/.test(f.group||"")?"💪":"🍱"; const n=norm(f.name); const m=EMO.find(x=>x[0].test(n)); return m?m[1]:"🍽️"; }
+function shortLabel(f){
+  if(catOf(f)==="picard") return f.name.split(",")[0];
+  const s=f.name.replace(/\(.*?\)/g,"").replace(/\b(crues?|cru|surgel[ée]e?s?|égouttée?s?|Carrefour|Picard|Barilla|Mission|Heinz|Cassegrain|Sensation)\b/gi,"").replace(/\b\d+([.,]\d+)?\s*%/g,"").replace(/\s+/g," ").trim();
+  return s.split(" ").slice(0,3).join(" ")||f.name;
+}
+const pcLabels = f=>f.id==="oeuf"?["œuf","œufs"]:["wrap","wraps"];
+function soirSpec(f){
+  if(!f) return null; const k=soirReel(f); if(!k) return null;
+  const base={e:emojiFor(f), l:shortLabel(f)};
+  if(isPc(f)) base.pc=pcLabels(f);
+  const gen = k==="prot" ? (isPc(f)?{min:2,max:6,step:1}:{min:100,max:300,step:10})
+            : k==="fec" ? (isPc(f)?{min:1,max:3,step:1}:{min:50,max:250,step:5})
+            : {def:f.portion};
+  return {k, o:Object.assign(base, gen, COMPO_OVR[f.id]||{}, {fid:f.id})};
+}
+function fixOpt(f){ const o={e:emojiFor(f), l:shortLabel(f), fid:f.id, def:f.portion}; if(isPc(f)) o.pc=pcLabels(f); return o; }
+function stockFoods(pred){ const seen={}; return state.stock.filter(e=>e.g>0).map(e=>foodById(e.foodId)).filter(f=>f && !seen[f.id] && (seen[f.id]=1) && pred(f)).sort(byName); }
+const SLOT_COMPO_TITLES = {matin:"Composer mon petit-déj", midi:"Composer mon midi", collation:"Composer ma collation", soir:"Composer mon plat", dessert:"Composer mon dessert"};
 let comp = null, wantRestes = false;
-function applyRestes(){ restes().forEach(x=>{ const k=x.m.k; if(comp.lock[k]) return; comp.sel[k]=COMPO_SOIR[k].indexOf(x.m.o); comp.lock[k]=true; }); }
 const clampN = (x,a,b)=>Math.max(a,Math.min(b,x));
 const roundStep = (x,st)=>Math.round(x/st)*st;
 const perG = f=>({kcal:f.kcal/f.portion, p:f.p/f.portion, f:f.f/f.portion, c:f.c/f.portion});
 const mulV = (v,g)=>({kcal:v.kcal*g, p:v.p*g, f:v.f*g, c:v.c*g});
-function cFood(o){ if(!o || o.none) return null; const id=o.fid||slug(o.n); return state.foods.find(f=>f.id===id)||DEFAULT_FOODS.find(f=>f.id===id)||null; }
-function reelSets(){
-  if(comp.kind==="midi"){
-    const toOpt=(e)=>f=>({e, l:f.name.split(",")[0], fid:f.id});
-    const hp=state.foods.filter(f=>f.group==="Picard HyperProtéiné").map(toOpt("💪"));
-    const ro=state.foods.filter(f=>f.group==="Picard rotation").map(toOpt("🍱"));
-    return {keys:["a","b"], caps:{a:"HyperProtéiné", b:"Rotation"}, opts:{a:hp.length?hp:[NONE_OPT], b:ro.concat([NONE_OPT])}};
+function cFood(o){ if(!o || o.none) return null; return foodById(o.fid); }
+const compoKey = ()=>comp.slot==="midi" ? "midi-"+comp.mode : comp.slot;
+// sources des roues selon le repas choisi
+function slotReels(slot, mode){
+  const withNone = (list, empty)=>list.length ? list.concat([NONE_OPT]) : [empty?EMPTY_OPT:NONE_OPT];
+  if(slot==="midi" && mode!=="maison"){
+    const pic=state.foods.filter(f=>catOf(f)==="picard").sort(byName);
+    const hp=pic.filter(f=>/HyperProt/.test(f.group||"")), ro=pic.filter(f=>!/HyperProt/.test(f.group||""));
+    return {calc:"fixed", keys:["a","b"], caps:{a:"HyperProtéiné", b:"Autre plat"}, opts:{a:hp.length?hp.map(fixOpt):[NONE_OPT], b:withNone(ro.map(fixOpt))}};
   }
-  return {keys:["prot","fec","leg","sau"], caps:{prot:"Protéine", fec:"Féculent", leg:"Légume", sau:"Sauce"}, opts:COMPO_SOIR};
+  if(slot==="soir" || slot==="midi"){
+    const by=k=>stockFoods(f=>soirReel(f)===k).map(f=>soirSpec(f).o);
+    const prot=by("prot");
+    return {calc:"plat", keys:["prot","fec","leg","sau"], caps:{prot:"Protéine", fec:"Féculent", leg:"Légume", sau:"Sauce"},
+      opts:{prot:prot.length?prot:[EMPTY_OPT], fec:withNone(by("fec"),true), leg:withNone(by("leg"),true), sau:withNone(by("sau"),true)}};
+  }
+  const fruit = withNone(stockFoods(isFruit).map(fixOpt), true);
+  if(slot==="matin"){
+    const shakes=state.foods.filter(f=>/shake/.test(norm(f.name))).sort(byName);
+    const base=shakes.concat(stockFoods(f=>!shakes.includes(f) && (catOf(f)==="boissons"||catOf(f)==="recettes"||/pain|brioche|cereale|flocon|muesli/.test(norm(f.name))))).map(fixOpt);
+    return {calc:"fixed", keys:["base","fruit","extra"], caps:{base:"Petit-déj", fruit:"Fruit", extra:"En plus"},
+      opts:{base:withNone(base,true), fruit, extra:withNone(stockFoods(f=>isDessert(f)||catOf(f)==="collations").map(fixOpt),true)}};
+  }
+  if(slot==="collation"){
+    return {calc:"fixed", keys:["col","fruit"], caps:{col:"Collation", fruit:"Fruit"},
+      opts:{col:withNone(stockFoods(f=>!isFruit(f) && (["collations","picard","recettes"].includes(catOf(f))||/oeuf|amande|noix|nugget|cake/.test(norm(f.name)))).map(fixOpt),true), fruit}};
+  }
+  return {calc:"fixed", keys:["des","fruit"], caps:{des:"Dessert", fruit:"Fruit"}, opts:{des:withNone(stockFoods(f=>!isFruit(f)&&isDessert(f)).map(fixOpt),true), fruit}};
+}
+const reelSets = ()=>slotReels(comp.slot, comp.mode);
+function homeStockFoods(slot){
+  if(slot==="soir") return stockFoods(()=>true);
+  const set=slotReels(slot,"maison"), ids={};
+  set.keys.forEach(k=>set.opts[k].forEach(o=>{ if(o.fid) ids[o.fid]=1; }));
+  return stockFoods(f=>ids[f.id] && stockOf(f.id));
+}
+function applyRestes(){
+  const set=reelSets();
+  restes().forEach(x=>{ const k=x.m.k; if(comp.lock[k] || !set.opts[k]) return; const i=set.opts[k].findIndex(o=>o.fid===x.f.id); if(i>=0){ comp.sel[k]=i; comp.lock[k]=true; } });
+}
+function initComp(){
+  comp = {ref:add, slot:add.slot, mode:"picard", lock:{}, spinning:false, restes:false,
+    yog: add.slot==="soir" && !day().items.some(i=>i.slot==="dessert")};
+  if(wantRestes){ wantRestes=false; comp.slot="soir"; comp.restes=true; }
+  restoreSel();
+  if(comp.restes) applyRestes();
+}
+function restoreSel(){
+  const set=reelSets(), saved=state.compo[compoKey()]||{}; comp.sel={};
+  set.keys.forEach(k=>{ const i=set.opts[k].findIndex(o=>o.fid && o.fid===saved[k]); comp.sel[k]=i>=0?i:0; });
 }
 function renderCompo(b){
-  if(!comp || comp.ref!==add){
-    comp = {ref:add, kind:add.slot==="midi"?"midi":"soir", lock:{}, yog:!day().items.some(i=>i.slot==="dessert"), spinning:false};
-    comp.sel = Object.assign({}, state.compo[comp.kind]||{});
-    if(wantRestes){ wantRestes=false; comp.kind="soir"; comp.sel=Object.assign({}, state.compo.soir||{}); comp.restes=true; applyRestes(); }
-  }
+  if(!comp || comp.ref!==add || comp.slot!==add.slot) initComp();
   const set=reelSets();
   set.keys.forEach(k=>{ const n=set.opts[k].length; if(!(comp.sel[k]>=0 && comp.sel[k]<n)) comp.sel[k]=0; });
   const col = k=>{
-    const opts=set.opts[k], one=opts.map(o=>{ const f=cFood(o), e=f&&stockOf(f.id), out=e&&e.g<=0; return `<div class="ri${out?" out":""}"><span class="em">${o.e}</span><span class="lb">${esc(o.l)}${out?" (épuisé)":""}</span></div>`; }).join("");
+    const one=set.opts[k].map(o=>`<div class="ri"><span class="em">${o.e}</span><span class="lb">${esc(o.l)}</span></div>`).join("");
     return `<div class="reelcol"><div class="reelcap">${set.caps[k]}</div><div class="reelwin"><div class="reel" data-reel="${k}" aria-label="${set.caps[k]}">${one.repeat(REEL_REP)}</div></div>
       <button class="lock ${comp.lock[k]?"on":""}" data-lock="${k}">${comp.lock[k]?"Gardé":"Garder"}</button></div>`;
   };
-  b.innerHTML = `<div class="seg" id="cKind"><button data-k="soir" class="${comp.kind==="soir"?"on":""}">Plat maison</button><button data-k="midi" class="${comp.kind==="midi"?"on":""}">Midi Picard</button></div>
+  const anyEmpty = set.calc==="plat" && set.opts.prot[0]===EMPTY_OPT || set.keys.every(k=>set.opts[k].every(o=>o.none));
+  b.innerHTML = `${comp.slot==="midi"?`<div class="seg" id="cKind"><button data-k="picard" class="${comp.mode!=="maison"?"on":""}">Plats Picard</button><button data-k="maison" class="${comp.mode==="maison"?"on":""}">Plat maison</button></div>`:""}
     <div class="slotm"><div class="reels" style="grid-template-columns:repeat(${set.keys.length},1fr)">${set.keys.map(col).join("")}</div>
     <button class="btn primary block spinbtn" id="cSpin">Lancer les roues</button></div>
-    ${comp.kind==="soir"?`<div class="chips" style="margin:10px 0 0">${canRestes()||comp.restes?`<button class="chip ${comp.restes?"on":""}" id="cRest">Finir mes restes</button>`:""}<button class="chip ${comp.yog?"on":""}" id="cYog">Garder 65 kcal pour un yaourt</button></div>`:""}
+    ${set.calc==="plat"?`<div class="chips" style="margin:10px 0 0">${canRestes()||comp.restes?`<button class="chip ${comp.restes?"on":""}" id="cRest">Finir mes restes</button>`:""}${comp.slot==="soir"?`<button class="chip ${comp.yog?"on":""}" id="cYog">Garder 65 kcal pour un yaourt</button>`:""}</div>`:""}
+    ${anyEmpty?`<div class="msg" style="margin-top:10px">Les roues montrent ce que tu as en stock. Ajoute tes courses dans Aliments, Stock, pour les remplir.</div>`:""}
     <div id="compoOut" style="margin-top:12px"></div>`;
   set.keys.forEach(k=>{
     const el=b.querySelector(`[data-reel="${k}"]`), n=set.opts[k].length;
@@ -1035,24 +1107,24 @@ function renderCompo(b){
     },120); },{passive:true});
   });
   b.querySelectorAll("[data-lock]").forEach(x=>x.onclick=()=>{ const k=x.dataset.lock; comp.lock[k]=!comp.lock[k]; x.classList.toggle("on",comp.lock[k]); x.textContent=comp.lock[k]?"Gardé":"Garder"; });
-  b.querySelectorAll("#cKind [data-k]").forEach(x=>x.onclick=()=>{ if(comp.kind===x.dataset.k) return; comp.kind=x.dataset.k; comp.lock={}; comp.sel=Object.assign({}, state.compo[comp.kind]||{}); renderCompo(b); });
-  const cr=$("cRest"); if(cr) cr.onclick=()=>{ comp.restes=!comp.restes; if(comp.restes) applyRestes(); else comp.lock={}; renderCompo(b); };
+  b.querySelectorAll("#cKind [data-k]").forEach(x=>x.onclick=()=>{ if(comp.mode===x.dataset.k) return; comp.mode=x.dataset.k; comp.lock={}; comp.restes=false; restoreSel(); renderCompo(b); });
+  const cr=$("cRest"); if(cr) cr.onclick=()=>{ comp.restes=!comp.restes; comp.lock={}; if(comp.restes) applyRestes(); renderCompo(b); };
   const y=$("cYog"); if(y) y.onclick=()=>{ comp.yog=!comp.yog; y.classList.toggle("on",comp.yog); computeCompo(); };
   $("cSpin").onclick=()=>spinCompo(b);
   computeCompo();
 }
 function spinCompo(b){
   if(comp.spinning) return;
-  const set=reelSets(), keys=set.keys.filter(k=>!comp.lock[k]);
-  if(!keys.length) return toast("Toutes les roues sont gardées");
+  const set=reelSets(), keys=set.keys.filter(k=>!comp.lock[k] && set.opts[k].some(o=>!o.none));
+  if(!keys.length) return toast(set.keys.some(k=>comp.lock[k])?"Toutes les roues sont gardées":"Rien en stock pour ce repas");
   const reduce=window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
   comp.spinning=true; let pending=keys.length;
   keys.forEach((k,i)=>{
     const el=b.querySelector(`[data-reel="${k}"]`), opts=set.opts[k], n=opts.length;
-    let cand=opts.map((o,j)=>j).filter(j=>{ if(opts[j].none) return false; const f=cFood(opts[j]), e=f&&stockOf(f.id); return !(e && e.g<e.thr); });
+    let cand=opts.map((o,j)=>j).filter(j=>{ if(opts[j].none) return false; const f=cFood(opts[j]), e=f&&stockOf(f.id); return !(set.calc==="plat" && e && e.g<e.thr); });
     if(!cand.length) cand=opts.map((o,j)=>j).filter(j=>!opts[j].none);
     if(cand.length>1) cand=cand.filter(j=>j!==comp.sel[k]);
-    const real=cand.length?cand[Math.floor(Math.random()*cand.length)]:0;
+    const real=cand[Math.floor(Math.random()*cand.length)];
     const from=el.scrollTop, to=(n*(REEL_MID+2+(i%2))+real)*REEL_H, dur=reduce?0:900+i*280;
     const finish=()=>{ el.style.scrollSnapType=""; comp.sel[k]=real; el.scrollTop=(n*REEL_MID+real)*REEL_H; if(--pending===0){ setTimeout(()=>{ comp.spinning=false; },160); computeCompo(); } };
     if(!dur) return finish();
@@ -1063,7 +1135,7 @@ function spinCompo(b){
 }
 function compoRow(o,f,g){
   const v=mulV(perG(f),g);
-  const qty = o.pc ? `${Math.round(g/f.portion)} ${Math.round(g/f.portion)>1?o.pc[1]:o.pc[0]}` : `${r0(g)} g`;
+  const qty = o.pc ? `${Math.round(g/f.portion)} ${Math.round(g/f.portion)>1?o.pc[1]:o.pc[0]}` : `${r0(g)} ${f.unit||"g"}`;
   return {o,f,g,v,qty};
 }
 function fitG(o,f,g,notes){
@@ -1079,10 +1151,11 @@ function computeCompo(){
   const set=reelSets(), s=state.settings, E=totals(day().items);
   const pick=k=>set.opts[k][comp.sel[k]];
   let rows=[], notes=new Set(), R=null;
-  if(comp.kind==="midi"){
-    ["a","b"].forEach(k=>{ const o=pick(k), f=cFood(o); if(f) rows.push(compoRow(o,f,f.portion)); });
+  const yogOn = comp.slot==="soir" && comp.yog;
+  if(set.calc==="fixed"){
+    set.keys.forEach(k=>{ const o=pick(k), f=cFood(o); if(f) rows.push(compoRow(o,f,fitG(o,f,o.def,notes))); });
   } else {
-    const res = comp.yog ? {kcal:65,p:11.5} : {kcal:0,p:0};
+    const res = yogOn ? {kcal:65,p:11.5} : {kcal:0,p:0};
     R = s.kcal - E.kcal - res.kcal;
     const M = clampN(R,350,1200), Pneed = s.p - E.p - res.p;
     const oP=pick("prot"), oF=pick("fec"), oL=pick("leg"), oS=pick("sau");
@@ -1124,21 +1197,22 @@ function computeCompo(){
   }
   if(!rows.length){ out.innerHTML=`<div class="msg">Choisis au moins un ingrédient.</div>`; comp.rows=[]; return; }
   comp.rows=rows;
-  const T=totals(rows.map(r=>r.v)), A=totals([E,T].concat(comp.kind==="soir"&&comp.yog?[{kcal:65,p:11.5,f:0.6,c:3.8}]:[]));
+  const T=totals(rows.map(r=>r.v)), A=totals([E,T].concat(yogOn?[{kcal:65,p:11.5,f:0.6,c:3.8}]:[]));
   out.innerHTML = `<div class="result">${rows.map(r=>{ const rest=isRest(r.f); return `<div class="crow"><span class="em">${r.o.e}</span><div class="t"><b>${esc(r.o.l)}</b><small>${rest?"fin du stock, ":(r.o.note?esc(r.o.note)+", ":"")}${r0(r.v.kcal)} kcal</small></div><div class="g">${r.qty}</div></div>`; }).join("")}</div>
-    <div class="total"><span>Le plat</span><span>${r0(T.kcal)} kcal</span></div>
+    <div class="total"><span>${set.calc==="plat"?"Le plat":"Total"}</span><span>${r0(T.kcal)} kcal</span></div>
     <div class="macline">${mac(T)}</div>
-    <div class="dayafter">Journée après ce plat${comp.kind==="soir"&&comp.yog?" et le yaourt":""} : <b>${r0(A.kcal)}</b> / ${r0(s.kcal)} kcal, <b>${r0(A.p)}</b> / ${r0(s.p)} g de protéines</div>
+    <div class="dayafter">Journée après ${set.calc==="plat"?"ce plat":"ça"}${yogOn?" et le yaourt":""} : <b>${r0(A.kcal)}</b> / ${r0(s.kcal)} kcal, <b>${r0(A.p)}</b> / ${r0(s.p)} g de protéines</div>
     ${[...notes].map(n=>`<div class="msg">${n}</div>`).join("")}
     <button class="btn primary block" id="cAdd" style="margin-top:12px">Ajouter ${slotName()}</button>`;
   $("cAdd").onclick=()=>{
     if(comp.spinning) return;
     pushItems(comp.rows.map(r=>({name:r.f.name, fid:r.f.id, grams:Math.round(r.g), ...r.v})),"compo");
-    state.compo[comp.kind]=Object.assign({}, comp.sel); save();
+    const sv={}; set.keys.forEach(k=>{ const o=pick(k); if(o&&o.fid) sv[k]=o.fid; }); state.compo[compoKey()]=sv; save();
     comp.rows.forEach(r=>addRecent(r.f.id));
-    done(comp.restes?"Restes cuisinés":"Plat ajouté");
+    done(comp.restes?"Restes cuisinés":"Ajouté");
   };
 }
+
 
 /* ---- stock : ce qu'il reste à la maison ---- */
 const PC_IDS = ["oeuf","wrap-ble-xl-mission"];
@@ -1149,7 +1223,7 @@ function fmtQ(f,g){
   if(isPc(f)){ const n=Math.round(g/f.portion); return `${n} ${f.id==="oeuf"?(n>1?"œufs":"œuf"):(n>1?"wraps":"wrap")}`; }
   return g>=1000 ? `${f1(g/1000)} kg` : `${r0(g)} g`;
 }
-function compoOptFor(id){ for(const k of ["prot","fec","leg","sau"]){ const o=COMPO_SOIR[k].find(o=>!o.none && slug(o.n)===id); if(o) return {k,o}; } return null; }
+function compoOptFor(id){ return soirSpec(foodById(id)); }
 function thrFor(f){ const m=compoOptFor(f.id); if(m){ const o=m.o; if(o.min!=null) return o.pc?o.min*f.portion:o.min; return o.def; } return f.portion; }
 let stockMsgs=[];
 function stockCheck(e){
@@ -1546,12 +1620,17 @@ function openFoodEdit(id, cat){
     <div class="field"><label>Lip.</label><input class="input" id="fF" type="number" inputmode="decimal" value="${+(f.f*100/f.portion).toFixed(1)}"></div>
     <div class="field"><label>Gluc.</label><input class="input" id="fC" type="number" inputmode="decimal" value="${+(f.c*100/f.portion).toFixed(1)}"></div></div>
     <p class="kbd" style="margin:0 0 12px">La portion, c'est ce que tu manges d'habitude en une fois (pas le paquet acheté). Elle sert de quantité proposée quand tu ajoutes ce produit à un repas.</p>
+    <div class="field"><label>J'en ai en stock (${f.unit||"g"})</label><input class="input" id="fStk" type="number" inputmode="decimal" placeholder="Laisse vide si tu ne le suis pas" value="${(()=>{ const e=id&&stockOf(id); return e?Math.round(Math.max(0,e.g)):""; })()}"></div>
+    <p class="kbd" style="margin:0 0 12px">Ce que tu as acheté (ex. 250 pour une cancoillotte). Ce qui est en stock apparaît dans les roues.</p>
     <button class="btn primary block" id="fSave">Enregistrer</button>
     ${id?`<button class="btn block" id="fShop" style="margin-top:8px" ${inShop?"disabled":""}>${inShop?"Déjà dans la liste de courses":"Ajouter à la liste de courses"}</button><button class="btn danger block" id="fDel" style="margin-top:8px">Supprimer de mes produits</button>`:""}`);
   $("fSave").onclick=()=>{ const name=$("fName").value.trim(); if(!name) return toast("Donne un nom");
     const por=parseFloat($("fPor").value)||100, k=por/100, v=x=>(parseFloat($(x).value)||0)*k;
     const nf=Object.assign({}, id?f:{}, {id:id||slug(name)||uid(),group:f.group||"Mes ajouts",cat:$("fCat").value,name,portion:por,kcal:v("fK"),p:+v("fP").toFixed(2),f:+v("fF").toFixed(2),c:+v("fC").toFixed(2),unit:f.unit||"g",barcode:f.barcode});
-    state.foods=state.foods.filter(x=>x.id!==nf.id).concat(nf); save(); closeSheet(); renderFoods(); toast("Enregistré"); };
+    state.foods=state.foods.filter(x=>x.id!==nf.id).concat(nf);
+    const sv=$("fStk").value.trim();
+    if(sv!==""){ const v=Math.max(0,parseFloat(sv)||0); let en=stockOf(nf.id); if(en) en.g=v; else if(v>0){ en={foodId:nf.id,g:v,thr:thrFor(nf),listed:false}; state.stock.push(en); } if(en) stockCheck(en); }
+    save(); closeSheet(); renderFoods(); toast("Enregistré"); flushStockMsgs(); };
   const sh=$("fShop"); if(sh) sh.onclick=()=>{ toast(shopAdd(f)); sh.disabled=true; sh.textContent="Dans la liste de courses"; };
   const del=$("fDel"); if(del) del.onclick=()=>{ if(!confirm("Supprimer ce produit de ta liste ?")) return; state.foods=state.foods.filter(x=>x.id!==id); save(); closeSheet(); renderFoods(); toast("Supprimé"); };
 }
