@@ -1539,16 +1539,18 @@ function openFoodEdit(id, cat){
   const f=id?state.foods.find(x=>x.id===id):{name:"",group:"Mes ajouts",cat:cat||"autres",portion:100,kcal:0,p:0,f:0,c:0,unit:"g"};
   const inShop = id && shopHas(id) && !shopHas(id).done;
   openSheet(head(id?"Produit":"Nouveau produit")+`<div class="field"><label>Nom</label><input class="input" id="fName" value="${esc(f.name)}" placeholder="Ex. Pâtes complètes crues"></div>
-    <div class="row"><div class="field" style="flex:2"><label>Catégorie</label><select class="input" id="fCat">${CATS.map(c=>`<option value="${c.id}" ${c.id===f.cat?"selected":""}>${esc(c.label)}</option>`).join("")}</select></div><div class="field"><label>Portion (${f.unit||"g"})</label><input class="input" id="fPor" type="number" inputmode="decimal" value="${f.portion}"></div></div>
-    <div class="row"><div class="field"><label>Kcal</label><input class="input" id="fK" type="number" inputmode="decimal" value="${Math.round(f.kcal)}"></div>
-    <div class="field"><label>Prot.</label><input class="input" id="fP" type="number" inputmode="decimal" value="${+(+f.p).toFixed(1)}"></div>
-    <div class="field"><label>Lip.</label><input class="input" id="fF" type="number" inputmode="decimal" value="${+(+f.f).toFixed(1)}"></div>
-    <div class="field"><label>Gluc.</label><input class="input" id="fC" type="number" inputmode="decimal" value="${+(+f.c).toFixed(1)}"></div></div>
-    <p class="kbd" style="margin:0 0 12px">Valeurs pour une portion.</p>
+    <div class="row"><div class="field" style="flex:2"><label>Catégorie</label><select class="input" id="fCat">${CATS.map(c=>`<option value="${c.id}" ${c.id===f.cat?"selected":""}>${esc(c.label)}</option>`).join("")}</select></div><div class="field"><label>Portion mangée (${f.unit||"g"})</label><input class="input" id="fPor" type="number" inputmode="decimal" value="${f.portion}"></div></div>
+    <div class="grp" style="margin-top:4px">Valeurs pour 100 ${f.unit||"g"}, comme sur l'étiquette</div>
+    <div class="row"><div class="field"><label>Kcal</label><input class="input" id="fK" type="number" inputmode="decimal" value="${+(f.kcal*100/f.portion).toFixed(0)}"></div>
+    <div class="field"><label>Prot.</label><input class="input" id="fP" type="number" inputmode="decimal" value="${+(f.p*100/f.portion).toFixed(1)}"></div>
+    <div class="field"><label>Lip.</label><input class="input" id="fF" type="number" inputmode="decimal" value="${+(f.f*100/f.portion).toFixed(1)}"></div>
+    <div class="field"><label>Gluc.</label><input class="input" id="fC" type="number" inputmode="decimal" value="${+(f.c*100/f.portion).toFixed(1)}"></div></div>
+    <p class="kbd" style="margin:0 0 12px">La portion, c'est ce que tu manges d'habitude en une fois (pas le paquet acheté). Elle sert de quantité proposée quand tu ajoutes ce produit à un repas.</p>
     <button class="btn primary block" id="fSave">Enregistrer</button>
     ${id?`<button class="btn block" id="fShop" style="margin-top:8px" ${inShop?"disabled":""}>${inShop?"Déjà dans la liste de courses":"Ajouter à la liste de courses"}</button><button class="btn danger block" id="fDel" style="margin-top:8px">Supprimer de mes produits</button>`:""}`);
   $("fSave").onclick=()=>{ const name=$("fName").value.trim(); if(!name) return toast("Donne un nom");
-    const nf={id:id||slug(name)||uid(),group:f.group||"Mes ajouts",cat:$("fCat").value,name,portion:parseFloat($("fPor").value)||100,kcal:parseFloat($("fK").value)||0,p:parseFloat($("fP").value)||0,f:parseFloat($("fF").value)||0,c:parseFloat($("fC").value)||0,unit:f.unit||"g",barcode:f.barcode};
+    const por=parseFloat($("fPor").value)||100, k=por/100, v=x=>(parseFloat($(x).value)||0)*k;
+    const nf=Object.assign({}, id?f:{}, {id:id||slug(name)||uid(),group:f.group||"Mes ajouts",cat:$("fCat").value,name,portion:por,kcal:v("fK"),p:+v("fP").toFixed(2),f:+v("fF").toFixed(2),c:+v("fC").toFixed(2),unit:f.unit||"g",barcode:f.barcode});
     state.foods=state.foods.filter(x=>x.id!==nf.id).concat(nf); save(); closeSheet(); renderFoods(); toast("Enregistré"); };
   const sh=$("fShop"); if(sh) sh.onclick=()=>{ toast(shopAdd(f)); sh.disabled=true; sh.textContent="Dans la liste de courses"; };
   const del=$("fDel"); if(del) del.onclick=()=>{ if(!confirm("Supprimer ce produit de ta liste ?")) return; state.foods=state.foods.filter(x=>x.id!==id); save(); closeSheet(); renderFoods(); toast("Supprimé"); };
